@@ -11,7 +11,7 @@ Each statement below is tagged:
 
 | Property | Value | Source |
 |---|---|---|
-| Part | **STMicroelectronics ST33K1M5T, revision B01** (secure MCU, ST33K family) | Security target ANSSI-CC-2023-08 (see below) |
+| Part | **STMicroelectronics ST33K1M5** (secure MCU, ST33K family). It is not yet known whether Ledger uses the `C` or the `T` variant; both are certified together as "ST33K1M5C and ST33K1M5T B01" | user + ANSSI-CC-2023-08 Appendix A [48]–[51] |
 | IC maskset | **K460** (die shows `K460A`) | die photo + ANSSI-CC-2023-08 |
 | Die marking | `K460A`, ST logo, `2020` (see §1.1) | [seen] `die_marking_K460A.png` |
 | Package marking | Ledger custom laser marking (see below) | [seen] 165806, 171319 |
@@ -23,12 +23,55 @@ Each statement below is tagged:
 
 The same SE is used in the Nano S+, Flex and Stax.
 
-### References
+### 1.0 What the ANSSI-CC-2023-08 document says about the platform
 
-- **ANSSI-CC-2023-08**: Common Criteria security target for a composite TOE built on this chip:
-  <https://messervices.cyber.gouv.fr/visas/ANSSI-CC-2023-08-cible.pdf>
-  > The hardware platform ST33K1M5T B01, designed by STMicroelectronics and used as certified platform
-  > o IC Maskset name: K460
+Source: **ANSSI-CC-2023-08, Security Target "ST33KTPM2XSPI & ST33KTPM2XI2C – TPM firmware 9.256"**
+(STMicroelectronics, rev 01-02p, 8 Nov 2022), <https://messervices.cyber.gouv.fr/visas/ANSSI-CC-2023-08-cible.pdf>
+
+> ⚠️ This is the security target for **ST's own TPM 2.0 product**, not for Ledger's firmware. It is useful
+> because the TPM is a composite product built on the same hardware platform, so its platform section
+> identifies our die. Everything about the TPM firmware, the SPI/I²C TPM interfaces and the EK keys applies
+> to the TPM product, **not** to the Ledger SE.
+
+**Hardware platform identification** (ST §2.1, quoted):
+
+| Field | Value |
+|---|---|
+| Platform | ST33K1M5T B01 (configuration B01) |
+| IC maskset name | **K460** ← matches the die marking `K460A` |
+| Master identification number | 0x0247 |
+| IC version | C |
+| IC firmware version | 3.1.4 |
+| Crypto library on top | NesLib 6.7.4 (ST's certified crypto library) |
+
+"The chip package is not included in the TOE": the certification covers the die only. That fits Ledger's
+custom-marked WLCSP.
+
+**Platform certification** (ST §2.3.1 and Appendix A):
+
+- Hardware certificate: **CC-22-0252712/2**, "ST33K1M5C and ST33K1M5T B01".
+- Platform security target: *ST33K1M5C and ST33K1M5T B01, Security Target for composition*, Rev B01.1, July 2022. This is the document that describes the hardware itself; it's worth finding.
+- Platform assurance level: **EAL6 augmented with ALC_FLR.1** (ST §8.2.4). The TPM composite is only EAL4+ (ALC_DVS.2, ALC_FLR.1, AVA_VAN.5).
+- NesLib 6.7.4 on ST33K1M5C/T B01: certificate **CC-22-0322914/2**, EAL5+ (ALC_FLR.1, ALC_DVS.2, AVA_VAN.5).
+
+**Manufacturing and development sites** (ST §2.4; listed for the TPM, but the hardware part presumably applies to the K460 die):
+
+- HW development: ST Rousset (FR), ST Ang Mo Kio (SG)
+- Embedded SW development (TPM): ST Rousset, ST Rennes (FR), ST Zaventem (BE)
+- Die manufacturing (wafer fab): **ST Crolles (FR)**
+- Test: ST Rousset (FR), ST Toa Payoh (SG)
+
+**Platform security mechanisms the TPM composite relies on** (ST §8.2.3, Table 8, platform SFR names). These hint at what the hardware provides:
+
+- FRU_FLT.2 / FPT_FLS.1: fault tolerance and secure state on failure (glitch/fault-injection detection)
+- FPT_PHP.3: resistance to physical attack (consistent with the active shield seen on the die)
+- FDP_ITT.1 / FPT_ITT.1 / FDP_IFC.1: protection of internal transfers and leakage control (side channels)
+- FDP_SDC.1 / FDP_SDI.2: stored-data confidentiality and integrity (memory encryption/integrity)
+- FCS_RNG.1 /PTG.2: physical TRNG (AIS-31 class PTG.2)
+- FCS_COP.1: hardware crypto accelerators for AES, RSA, ECC, SHA-2, SHA-3 and DRBG, used through NesLib
+- FMT_LIM.1/2 /Test, FAU_SAS.1: test features are locked after manufacturing, and an audit record is written during test
+- FMT_LIM.1/2 /Loader, FIA_API.1, FTP_ITC.1 /Loader: the platform has a **Flash Loader** for secure download of user software. The TPM product deactivates it permanently. **[TBD]** how Ledger provisions its OS onto the SE (presumably through this loader, at Ledger's factory).
+- FDP_ACC.2 / FDP_ACF.1 / FMT_MSA… /Memories: hardware memory access control (MPU/firewall)
 
 ### 1.1 Die marking (metal layer, `pics/die_marking_K460A.png`)
 
@@ -40,7 +83,7 @@ The same SE is used in the Nano S+, Flex and Stax.
                       2020
 ```
 
-- `K460A`: **confirmed**. The IC maskset name of the ST33K1M5T B01 is `K460`, according to the CC security target. The trailing `A` is probably a mask revision or variant letter **[TBD]**.
+- `K460A`: **confirmed**. The IC maskset name of the ST33K1M5C/T B01 platform is `K460`, according to ANSSI-CC-2023-08 §2.1. The trailing `A` is probably a mask revision or variant letter **[TBD]**.
 - `(C) STW` and `(C) ZMB`, each followed by a small square: copyright lines. These could be design-team, site or IP-block tags. **[TBD]** meaning.
 - `ST3`: probably the product-family prefix (ST33…), cut off at the edge of the marking block.
 - `(M)` and `(C)` in boxes: mask-work and copyright symbols.

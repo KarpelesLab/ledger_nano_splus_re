@@ -7,16 +7,24 @@ secure element, which the Nano S+, Flex and Stax all share.
 
 | Path | What |
 |---|---|
-| [`docs/secure_element.md`](docs/secure_element.md) | U1 secure element (ST33K1M5T B01, maskset K460): package, markings, orientation, ball map |
+| [`docs/secure_element.md`](docs/secure_element.md) | U1 secure element (ST33K1M5, maskset K460): package, markings, orientation, ball map |
 | `pics/` | Board, footprint, chip and die micrographs |
 
 ## Status
 
-- **Secure element:** identified as STMicroelectronics ST33K1M5T B01, maskset K460
-  (confirmed by the die marking and CC security target ANSSI-CC-2023-08). It's a 24-ball 4×6 WLCSP
+- **Secure element:** identified as STMicroelectronics ST33K1M5 (B01 platform), maskset K460.
+  This is confirmed by the die marking and by ST's TPM security target
+  [ANSSI-CC-2023-08](https://messervices.cyber.gouv.fr/visas/ANSSI-CC-2023-08-cible.pdf),
+  which names K460 as the maskset of its ST33K1M5C/T B01 hardware platform. It's a 24-ball 4×6 WLCSP
   (≈2.6 × 1.8 mm, 0.4 mm pitch) with Ledger's own laser marking (`!L! KC7A6`).
   Orientation is established (A1 = silkscreen-dot corner). The ball map comes from
   photos only: 12 balls are likely GND, and the rest still need continuity checks.
+
+## External references
+
+- [ANSSI-CC-2023-08 security target](https://messervices.cyber.gouv.fr/visas/ANSSI-CC-2023-08-cible.pdf):
+  ST33KTPM2X TPM, built on the same ST33K1M5 B01 / K460 platform. It is the source of the maskset, platform
+  certificate and fab-site details summarised in `docs/secure_element.md` §1.0.
 
 ## Conventions
 
