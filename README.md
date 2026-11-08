@@ -22,6 +22,9 @@ secure element, which the Nano S+, Flex and Stax all share.
 
 ## External references
 
+- [ST33K1M5C and ST33K1M5T B01 – Security Target for composition](https://sec-certs.org/cc/9238e8b74c987b68/target.pdf)
+  (SMD_ST33K1M5_ST_21_001 Rev B01.1, [certificate record](https://sec-certs.org/cc/9238e8b74c987b68/)).
+  This is the chip's own CC document (EAL6+): CPU, memories, interfaces, pins, life cycle and security mechanisms.
 - [ANSSI-CC-2023-08 security target](https://messervices.cyber.gouv.fr/visas/ANSSI-CC-2023-08-cible.pdf):
   ST33KTPM2X TPM, built on the same ST33K1M5 B01 / K460 platform. It is the source of the maskset, platform
   certificate and fab-site details summarised in `docs/secure_element.md` §1.0.

@@ -11,7 +11,7 @@ Each statement below is tagged:
 
 | Property | Value | Source |
 |---|---|---|
-| Part | **STMicroelectronics ST33K1M5** (secure MCU, ST33K family). It is not yet known whether Ledger uses the `C` or the `T` variant; both are certified together as "ST33K1M5C and ST33K1M5T B01" | user + ANSSI-CC-2023-08 Appendix A [48]–[51] |
+| Part | **STMicroelectronics ST33K1M5** (secure MCU, ST33K platform, B01). Probably the **`C`** variant: ST says "ST33K1M5C … mainly target[s] the Customer market, while the ST33K1M5T … the TPM market". Not confirmed; the master ID would tell (`C` = 0x0227, `T` = 0x0247) | user + platform ST §1.4 |
 | IC maskset | **K460** (die shows `K460A`) | die photo + ANSSI-CC-2023-08 |
 | Die marking | `K460A`, ST logo, `2020` (see §1.1) | [seen] `die_marking_K460A.png` |
 | Package marking | Ledger custom laser marking (see below) | [seen] 165806, 171319 |
@@ -23,7 +23,90 @@ Each statement below is tagged:
 
 The same SE is used in the Nano S+, Flex and Stax.
 
-### 1.0 What the ANSSI-CC-2023-08 document says about the platform
+### 1.0 Platform security target (primary hardware reference)
+
+Source: **ST33K1M5C and ST33K1M5T B01 – Security Target for composition**, SMD_ST33K1M5_ST_21_001 Rev B01.1, July 2022
+(STMicroelectronics). Public copy: <https://sec-certs.org/cc/9238e8b74c987b68/target.pdf>
+(certificate record: <https://sec-certs.org/cc/9238e8b74c987b68/>). This is the chip's own CC document, evaluated under the
+Dutch NSCIB scheme at **EAL6 augmented with ALC_FLR.1** and claiming conformance to BSI-CC-PP-0084-2014. Section numbers below refer to it.
+
+**Identification** (§1.4, Table 1):
+
+| IC maskset | Commercial product | Master ID | IC version | Firmware version |
+|---|---|---|---|---|
+| **K460** | ST33K1M5C / ST33K1M5T | 0x0227 / 0x0247 | B / C | 3.1.3 / 3.1.4 |
+
+- "The IC maskset name is the product hardware identification." The IC version changes with any hardware change (some mask layers) or any change to the OST test software.
+- The marking on the die, readable registers and specific instructions give the product information (§1.4 ¶18). The die marking `K460A` is part of that identification.
+- All derivatives share the same hardware design and maskset. Each derivative has its own "Child product identification number" (listed in the datasheet and the FW user manual).
+- Derivatives are configured in **Admin configuration**, by ST or by the customer (§1.5 Table 2):
+  - NVM size: 512, 768, 1024, 1280 or 1534 KB
+  - CPU and SPI frequency, temperature range: depend on the commercial product
+
+**Hardware** (§1.5–1.6.1):
+
+- CPU: **2 × Arm Cortex-M35P in lockstep**, 70 or 75 MHz, Thumb-2. Each has an Armv8-M MPU with up to 16 regions.
+- **LPU** (Library Protection Unit): isolates protected code such as a library from the rest. It may be reserved by ST for its own libraries.
+- Memory: **64 KB user RAM**, up to **1534 KB user Flash (NVM)**, ST ROM and System ROM, an OST ROM for test, and a Flash read cache.
+- Crypto:
+  - AES-128/192/256 accelerator (ECB, CBC)
+  - 3-key Triple-DES accelerator "EDES+" (ECB, CBC)
+  - **NESCRYPT LLP** public-key coprocessor with its own RAM
+  - SM4 and MIFARE accelerators (out of evaluation scope)
+  - 16/32-bit CRC block
+- TRNG: AIS20/AIS31 PTG.2, accessed directly through registers.
+- **Interfaces** (¶36):
+  - **2 × ISO/IEC 7816-3 slave UARTs** (T=0, T=1)
+  - **SWP** slave interface (single-wire protocol to an NFC router)
+  - **SPI master/slave**
+  - **I²C master/slave**
+  - Every interface has its own RAM buffer.
+- Timers: 3 × 16-bit general-purpose timers, a watchdog, and a permanent timer that keeps counting in low-power mode.
+- Other blocks: reset manager, clock manager, "security administrator".
+- **Pins shown in the block diagram (Figure 1): `VCC1`, `VCC2`, `GND1`, `GND2`, `10 GPIOs`**. See §3 for how this fits our ball count.
+
+**Firmware and life-cycle states** (§1.6.2, §6.3):
+
+- **OST ROM**: ST's test OS, unreachable after delivery.
+- **System ROM + ST NVM firmware**, which includes:
+  - The **Secure Flash Loader**: a fast, ciphered, integrity-checked download of the embedded software into NVM. It is available only in Admin configuration, and the customer can disable it irreversibly (§6.3 ¶334).
+  - **Flash Drivers** that the embedded software uses to manage NVM (User configuration).
+  - Protected test and profiling commands (not available in User configuration).
+  - A small set of diagnostic commands reserved to ST.
+  - **Secure Diagnostic**: the customer must enable it, and ST then runs it on its own audited sites. The customer can disable it permanently. Its status can be read: permanently disabled, permanently enabled, or still configurable (§6.5).
+- Configurations: **Test** (ST only), **Admin** (loader and configuration), **User** (normal run), and **Diagnostic volatile** (ST only). Transitions are controlled by fuses, authentication and control registers (§6.3).
+- In Admin configuration, the firmware can prove the chip is genuine to another device using a cryptographic mechanism (§6.17, FIA_API.1).
+- Loader sessions are encrypted, integrity-checked and logged (§6.18–6.25).
+- For Ledger, presumably: the OS is loaded through the Secure Flash Loader in Admin configuration, then the chip is switched to User configuration. **[TBD]** whether Ledger keeps the loader for OS updates or uses its own bootloader in User NVM.
+
+**Security mechanisms** (§6):
+
+- **Events that trigger a reset or interrupt** (§6.2): die-integrity violation (active shield), memory/register errors, glitches, high supply voltage, out-of-range temperature, CPU/MPU errors (including lockstep mismatch), faults on the crypto processors. The software can also trigger a reset itself.
+- **Confidentiality**: memory scrambling and encryption, **bus encryption**, concealment of operation execution, MPU/LPU, active shields (§6.6, §6.10).
+- **Integrity**: error-detecting codes (EDC) on the memories, plus MPU/LPU (§6.7).
+- **Physical**: anti-probing countermeasures, and active shields that react automatically when die integrity is violated (§6.9). This matches the shield mesh visible in `die_marking_K460A.png`.
+
+**Delivery** (§1.6.4, §1.7): wafers, micromodules or packages, with the firmware already on the chip. The evaluation covers phases 2–3 and optionally phase 4 (packaging).
+
+**Sites** (Table 15, abridged):
+
+- Wafer fab (FE): **ST Crolles**, which also makes masks
+- Masks: also AMTC/Toppan Dresden, DNP (Japan), DPE (Agrate)
+- Wafer test (EWS): ST Rousset, ST Toa Payoh, Ardentec (Taiwan)
+- Packaging (BE): Amkor Taiwan (ATT1/3/6), Smartflex (Singapore), ST Bouskoura (Morocco), STS Shenzhen, UTAC Thailand, CMP Gardanne
+- Design (DEV): Rousset, Crolles, Grenoble, Rennes, Sophia, Zaventem, Catania, Palermo, Ljubljana, Ang Mo Kio
+
+**Public-key coprocessor scope**: the platform ST certifies only the AES and DES accelerators as crypto services. RSA and ECC run on the NESCRYPT LLP through ST's **NesLib** library, which is certified separately (NesLib 6.7.4: certificate CC-22-0322914/2, security target <https://www.commoncriteriaportal.org/files/epfiles/NSCIB-CC-0322914-STlite%20_v02_0.pdf>).
+
+**Guidance documents** (Table 14). These are NDA-only and sent by ST as encrypted PDFs, but the names help when searching:
+
+- `DS_ST33K1M5C` v4 / `DS_ST33K1M5T` v3: datasheets (these would contain the ballout)
+- `UM_ST33K_FW` v6: platform firmware V3 user manual
+- `AN_SECU_ST33K`: security guidance
+- `UM_ST_TRNG14`, `AN_ST33K_TRNG`: TRNG documentation
+- Arm Cortex-M35P TRM `100883_0101_00_en` (r1p1): public from Arm
+
+### 1.0b What the ANSSI-CC-2023-08 (TPM) document adds
 
 Source: **ANSSI-CC-2023-08, Security Target "ST33KTPM2XSPI & ST33KTPM2XI2C – TPM firmware 9.256"**
 (STMicroelectronics, rev 01-02p, 8 Nov 2022), <https://messervices.cyber.gouv.fr/visas/ANSSI-CC-2023-08-cible.pdf>
@@ -50,7 +133,7 @@ custom-marked WLCSP.
 **Platform certification** (ST §2.3.1 and Appendix A):
 
 - Hardware certificate: **CC-22-0252712/2**, "ST33K1M5C and ST33K1M5T B01".
-- Platform security target: *ST33K1M5C and ST33K1M5T B01, Security Target for composition*, Rev B01.1, July 2022. This is the document that describes the hardware itself; it's worth finding.
+- Platform security target: *ST33K1M5C and ST33K1M5T B01, Security Target for composition*, Rev B01.1, July 2022. Now summarised in §1.0 above.
 - Platform assurance level: **EAL6 augmented with ALC_FLR.1** (ST §8.2.4). The TPM composite is only EAL4+ (ALC_DVS.2, ALC_FLR.1, AVA_VAN.5).
 - NesLib 6.7.4 on ST33K1M5C/T B01: certificate **CC-22-0322914/2**, EAL5+ (ALC_FLR.1, ALC_DVS.2, AVA_VAN.5).
 
@@ -167,6 +250,16 @@ TOP VIEW, A1 top-left
 | C2–C5, D2–D5 | signals / supply | [TBD] | Each has its own RDL trace to a die edge pad |
 
 **Count:** 12 balls very likely GND (A1, A2, A5, A6, B1–B6, C6, D6). That leaves **12 functional balls** at most (A3, A4, C1–C5, D1–D5), fewer if C1/D1 turn out to be GND.
+
+### 3.1 Pin budget vs. the platform block diagram
+
+The block diagram in the platform ST (Figure 1) shows the chip's external pins as **VCC1, VCC2, GND1, GND2 and 10 GPIOs**.
+The ISO7816 UARTs, SWP, SPI and I²C presumably come out on those GPIOs.
+
+- 24 balls − 12 likely GND = **12 balls left**, which is exactly **VCC1 + VCC2 + 10 GPIOs**.
+- So, as a hypothesis: the 12 GND balls are GND1/GND2 duplicated many times (normal for a WLCSP), and the remaining 12 are **2 supply + 10 GPIO**. Reset and clock are then either GPIO functions or internal: the chip has its own clock manager and reset manager.
+- That would make **C1/D1 a supply ball** (or a pair) rather than GND. They sit next to the decoupling caps C1/C2, which fits. **[TBD]** continuity test.
+- `VCC1`/`VCC2` could be the main supply plus a separate supply for the SWP/IO domain, which is common on ST33 parts. **[TBD]**
 
 ## 4. Other observations
 
