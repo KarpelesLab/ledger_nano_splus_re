@@ -11,7 +11,8 @@ Each statement below is tagged:
 
 | Property | Value | Source |
 |---|---|---|
-| Part | **STMicroelectronics ST33K1M5** (secure MCU, ST33K family) | user, confirmed under microscope |
+| Part | **STMicroelectronics ST33K1M5T, revision B01** (secure MCU, ST33K family) | Security target ANSSI-CC-2023-08 (see below) |
+| IC maskset | **K460** (die shows `K460A`) | die photo + ANSSI-CC-2023-08 |
 | Die marking | `K460A`, ST logo, `2020` (see §1.1) | [seen] `die_marking_K460A.png` |
 | Package marking | Ledger custom laser marking (see below) | [seen] 165806, 171319 |
 | Type | WLCSP / bumped die with RDL (bare silicon, polyimide + copper redistribution layer visible on bump side) | [seen] 171031, 171107 |
@@ -21,6 +22,13 @@ Each statement below is tagged:
 | Refdes on PCB | U1 (Nano S+) | [seen] 171512 |
 
 The same SE is used in the Nano S+, Flex and Stax.
+
+### References
+
+- **ANSSI-CC-2023-08**: Common Criteria security target for a composite TOE built on this chip:
+  <https://messervices.cyber.gouv.fr/visas/ANSSI-CC-2023-08-cible.pdf>
+  > The hardware platform ST33K1M5T B01, designed by STMicroelectronics and used as certified platform
+  > o IC Maskset name: K460
 
 ### 1.1 Die marking (metal layer, `pics/die_marking_K460A.png`)
 
@@ -32,7 +40,7 @@ The same SE is used in the Nano S+, Flex and Stax.
                       2020
 ```
 
-- `K460A`: die/mask identifier, probably ST's internal die code for the ST33K1M5.
+- `K460A`: **confirmed**. The IC maskset name of the ST33K1M5T B01 is `K460`, according to the CC security target. The trailing `A` is probably a mask revision or variant letter **[TBD]**.
 - `(C) STW` and `(C) ZMB`, each followed by a small square: copyright lines. These could be design-team, site or IP-block tags. **[TBD]** meaning.
 - `ST3`: probably the product-family prefix (ST33…), cut off at the edge of the marking block.
 - `(M)` and `(C)` in boxes: mask-work and copyright symbols.
