@@ -230,7 +230,7 @@ TOP VIEW, A1 top-left
             1      2      3      4      5      6
    A      GND    GND    sig    sig    GND    GND
    B      VCC    GND    GND    GND    GND    GND
-   C      GND?   ?      ?      ?      ?      GND
+   C      VCC2?  ?      ?      ?      ?      GND
    D      GND    ?      ?      ?      ?      GND
 ```
 
@@ -246,11 +246,11 @@ TOP VIEW, A1 top-left
 | B2–B6 | GND | [seen]/[inferred] | Chip RDL bus joins B2…B6, and a matching PCB trace bus joins B2…B6 |
 | C6 | GND | [inferred] | RDL links B6–C6–D6 |
 | D6 | GND | [inferred] | RDL link to C6; PCB link C6–D6 |
-| D1 | **GND** | **[measured]** (2026-11) | Confirmed by measurement. This also confirms that the wide RDL trace from the C1/D1 junction to the row-B GND bus (via the vertical trace between columns 2 and 3) is a real connection. |
-| C1 | GND (likely) | [inferred] | Short RDL link to D1 on the die, so it is the same net as D1. **[TBD]** beep to confirm. |
+| D1 | **GND** | **[measured]** (2026-11) | Confirmed by measurement. This supports reading the wide RDL trace from D1 to the row-B GND bus (via the vertical trace between columns 2 and 3) as a real connection. |
+| C1 | **not GND** (likely `VCC2`) | **[measured]** not GND | Measured not GND. So the apparent C1–D1 "RDL link" in 171107 is **not** copper; it was probably underfill or flux bridging the two balls. C1 has its own feed from a die edge pad on the left side. It is the ball next to decoupling caps C1/C2. **[TBD]** check whether it is shorted to B1 and measure its voltage under power. |
 | C2–C5, D2–D5 | signals / supply | [TBD] | Each has its own RDL trace to a die edge pad |
 
-**Count:** 1 VCC (B1, measured) and 13 GND (D1 measured; A1, A2, A5, A6, B2–B6, C1, C6, D6 inferred). That leaves **10 balls** (A3, A4, C2–C5, D2–D5) to identify, and each has its own RDL trace to a die edge pad.
+**Count:** 1 VCC (B1, measured), 12 GND (D1 measured; A1, A2, A5, A6, B2–B6, C6, D6 inferred), C1 (measured not GND), and **10 balls** (A3, A4, C2–C5, D2–D5) with their own RDL trace to a die edge pad.
 
 ### 3.1 Pin budget vs. the platform block diagram
 
@@ -258,14 +258,18 @@ The block diagram in the platform ST (Figure 1) shows the chip's external pins a
 The ISO7816 UARTs, SWP, SPI and I²C presumably come out on those GPIOs.
 
 - **B1 = VCC** (measured), probably `VCC1`, the main supply, decoupled by C2 through the adjacent via.
-- **D1 = GND** (measured), and C1 is RDL-tied to D1. So C1/D1 is **not** `VCC2`, which rules out my earlier hypothesis.
-- That gives 24 balls = 13 GND + 1 VCC + **10 remaining balls (A3, A4, C2–C5, D2–D5)**, which matches the block diagram's **10 GPIOs** exactly.
-- So `VCC2` does not seem to have its own ball in this package. Possible explanations **[TBD]**:
-  - `VCC2` is tied to `VCC1` on the die or in the RDL (B1 serving both).
-  - `VCC2` powers a domain that this package doesn't bring out, for example the SWP/contactless IO supply on parts with an SWP pin.
-  - One of the 10 "GPIO" balls is actually `VCC2`. Checking each with a meter against B1, and under power, would settle it.
-- `GND1`/`GND2` both land on the 13 GND balls.
-- Reset and clock would then be GPIO functions or internal (the chip has its own clock and reset managers).
+- **D1 = GND** (measured). **C1 is not GND** (measured), so C1 is a separate net despite the bridge that looked like a link in the bump-side photo.
+- 24 balls = 12 GND + B1 + C1 + 10 others, which matches the block diagram exactly:
+
+| Block diagram | Balls | Status |
+|---|---|---|
+| `GND1`, `GND2` | A1, A2, A5, A6, B2–B6, C6, D6, D1 (12) | D1 measured, rest inferred |
+| `VCC1` | B1 | measured VCC |
+| `VCC2` | **C1** (hypothesis) | measured not GND; sits next to the decoupling caps |
+| `10 GPIOs` | A3, A4, C2–C5, D2–D5 | each has its own die-pad RDL trace |
+
+- **[TBD]** To settle C1: check for a short between C1 and B1 (if shorted, it is a second `VCC1` ball, and `VCC2` is elsewhere or internal). Then measure C1's voltage under power and compare it with B1. `VCC2` may be a separate IO/SWP-domain supply.
+- Reset and clock would be GPIO functions or internal (the chip has its own clock and reset managers).
 
 ## 4. Other observations
 
@@ -275,7 +279,7 @@ The ISO7816 UARTs, SWP, SPI and I²C presumably come out on those GPIOs.
 
 ## 5. Next steps
 
-1. Continuity-test every pad on the bare footprint against a known GND (USB shield / battery −) to confirm or correct the GND list. D1 is confirmed GND; beep C1 next (expected GND).
-2. ~~Find VCC~~: B1 = VCC (measured). Next, check whether any of the 10 remaining balls is shorted to B1 or sits at a supply level under power (a possible `VCC2`).
+1. Continuity-test every pad on the bare footprint against a known GND (USB shield / battery −) to confirm or correct the GND list. D1 is confirmed GND and C1 confirmed not GND. Still to beep: the other 11 inferred GND balls.
+2. ~~Find VCC~~: B1 = VCC (measured). Next, check C1 against B1 (short?) and measure C1 under power (`VCC2`?).
 3. Trace A3/A4 through R1/R4 to the MCU (STM32 on the S+). Likely candidates are the SE↔MCU link (ISO7816-style IO/CLK/RST or SPI) **[TBD]**.
 4. Do the same on the Flex and Stax boards to confirm the footprint and pinout are identical.
