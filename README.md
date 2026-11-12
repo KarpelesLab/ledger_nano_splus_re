@@ -18,8 +18,8 @@ secure element, which the Nano S+, Flex and Stax all share.
   which names K460 as the maskset of its ST33K1M5C/T B01 hardware platform. It's a 24-ball 4×6 WLCSP
   (≈2.6 × 1.8 mm, 0.4 mm pitch) with Ledger's own laser marking (`!L! KC7A6`).
   Orientation is established (A1 = silkscreen-dot corner). The ball map comes from
-  photos, plus one measurement: **B1 = VCC** (measured). 11 balls are likely GND, and the rest
-  still need continuity checks. The current hypothesis is C1/D1 = VCC2 and the 10 remaining balls = the 10 GPIOs.
+  photos, plus measurements: **B1 = VCC**, **D1 = GND**. 13 balls are GND (1 measured, 12 inferred).
+  The 10 remaining balls (A3, A4, C2–C5, D2–D5) match the 10 GPIOs in ST's block diagram.
 
 ## External references
 

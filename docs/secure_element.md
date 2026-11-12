@@ -230,8 +230,8 @@ TOP VIEW, A1 top-left
             1      2      3      4      5      6
    A      GND    GND    sig    sig    GND    GND
    B      VCC    GND    GND    GND    GND    GND
-   C      ?      ?      ?      ?      ?      GND
-   D      ?      ?      ?      ?      ?      GND
+   C      GND?   ?      ?      ?      ?      GND
+   D      GND    ?      ?      ?      ?      GND
 ```
 
 | Ball | Net | Confidence | Evidence |
@@ -246,23 +246,26 @@ TOP VIEW, A1 top-left
 | B2–B6 | GND | [seen]/[inferred] | Chip RDL bus joins B2…B6, and a matching PCB trace bus joins B2…B6 |
 | C6 | GND | [inferred] | RDL links B6–C6–D6 |
 | D6 | GND | [inferred] | RDL link to C6; PCB link C6–D6 |
-| C1, D1 | ? (possibly GND or supply) | [TBD] | Short RDL link C1–D1 on chip; a wide RDL trace from there may join the GND bus (hard to resolve optically). Closest balls to decoupling caps C1/C2 |
+| D1 | **GND** | **[measured]** (2026-11) | Confirmed by measurement. This also confirms that the wide RDL trace from the C1/D1 junction to the row-B GND bus (via the vertical trace between columns 2 and 3) is a real connection. |
+| C1 | GND (likely) | [inferred] | Short RDL link to D1 on the die, so it is the same net as D1. **[TBD]** beep to confirm. |
 | C2–C5, D2–D5 | signals / supply | [TBD] | Each has its own RDL trace to a die edge pad |
 
-**Count:** 1 VCC (B1, measured) and 11 balls very likely GND (A1, A2, A5, A6, B2–B6, C6, D6). That leaves **12 balls** (A3, A4, C1–C5, D1–D5) to identify, and C1/D1 are tied together on the die.
+**Count:** 1 VCC (B1, measured) and 13 GND (D1 measured; A1, A2, A5, A6, B2–B6, C1, C6, D6 inferred). That leaves **10 balls** (A3, A4, C2–C5, D2–D5) to identify, and each has its own RDL trace to a die edge pad.
 
 ### 3.1 Pin budget vs. the platform block diagram
 
 The block diagram in the platform ST (Figure 1) shows the chip's external pins as **VCC1, VCC2, GND1, GND2 and 10 GPIOs**.
 The ISO7816 UARTs, SWP, SPI and I²C presumably come out on those GPIOs.
 
-- **B1 = VCC** (measured). Most likely this is `VCC1`, the main supply, decoupled by C2 through the adjacent via.
-- 24 balls − 11 GND − B1 = **12 balls left**: A3, A4, C1–C5, D1–D5.
-- **C1 and D1 are joined by an RDL link on the die**, so they are one net on two balls. That leaves **11 distinct nets** for 1 supply + 10 GPIOs (`VCC2` + 10 GPIOs). This fits exactly if:
-  - **C1/D1 = `VCC2`** (doubled up like the GND balls, and next to the decoupling caps), and
-  - **A3, A4, C2–C5, D2–D5 = the 10 GPIOs** (each has its own RDL trace to a die edge pad).
-- The GND balls would then be GND1/GND2 duplicated many times on the die, which is normal for a WLCSP. Reset and clock would be GPIO functions or internal (the chip has its own clock and reset managers).
-- `VCC1`/`VCC2` could be the main supply plus a separate supply for the SWP/IO domain. **[TBD]** Measure whether C1/D1 is powered, and at what voltage compared with B1.
+- **B1 = VCC** (measured), probably `VCC1`, the main supply, decoupled by C2 through the adjacent via.
+- **D1 = GND** (measured), and C1 is RDL-tied to D1. So C1/D1 is **not** `VCC2`, which rules out my earlier hypothesis.
+- That gives 24 balls = 13 GND + 1 VCC + **10 remaining balls (A3, A4, C2–C5, D2–D5)**, which matches the block diagram's **10 GPIOs** exactly.
+- So `VCC2` does not seem to have its own ball in this package. Possible explanations **[TBD]**:
+  - `VCC2` is tied to `VCC1` on the die or in the RDL (B1 serving both).
+  - `VCC2` powers a domain that this package doesn't bring out, for example the SWP/contactless IO supply on parts with an SWP pin.
+  - One of the 10 "GPIO" balls is actually `VCC2`. Checking each with a meter against B1, and under power, would settle it.
+- `GND1`/`GND2` both land on the 13 GND balls.
+- Reset and clock would then be GPIO functions or internal (the chip has its own clock and reset managers).
 
 ## 4. Other observations
 
@@ -272,7 +275,7 @@ The ISO7816 UARTs, SWP, SPI and I²C presumably come out on those GPIOs.
 
 ## 5. Next steps
 
-1. Continuity-test every pad on the bare footprint against a known GND (USB shield / battery −) to confirm or correct the GND list. Check C1/D1 first; C1/D1 is expected **not** to be GND.
-2. ~~Find VCC~~: B1 = VCC (measured). Next, check C1/D1 for a second supply (`VCC2`) and compare its voltage with B1.
+1. Continuity-test every pad on the bare footprint against a known GND (USB shield / battery −) to confirm or correct the GND list. D1 is confirmed GND; beep C1 next (expected GND).
+2. ~~Find VCC~~: B1 = VCC (measured). Next, check whether any of the 10 remaining balls is shorted to B1 or sits at a supply level under power (a possible `VCC2`).
 3. Trace A3/A4 through R1/R4 to the MCU (STM32 on the S+). Likely candidates are the SE↔MCU link (ISO7816-style IO/CLK/RST or SPI) **[TBD]**.
 4. Do the same on the Flex and Stax boards to confirm the footprint and pinout are identical.
