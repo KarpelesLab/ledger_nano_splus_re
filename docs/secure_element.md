@@ -193,7 +193,7 @@ Two independent features mark the **same corner**:
 2. **Dark marker / blotch on the chip's bump side**, at the corner that sits over that dot once the chip is flipped (bottom-left in 171107). **[seen]**
 
 The mapping between the chip's bottom side and the footprint was confirmed four ways **[inferred]**:
-- The horizontal RDL bus on the chip lines up with the horizontal PCB trace bus in the same row.
+- The horizontal RDL bus on the chip (B2–B6) lines up with the horizontal PCB trace bus in the same row.
 - Every short vertical RDL link (A2–B2, C6–D6) lines up with a matching short PCB link.
 - Where solder separated on removal, a ball missing on one side matches a ball still present on the other (D1, D2, C2).
 - The two PCB traces going to R1/R4 come from balls that have their own die-pad RDL feed (A3, A4).
@@ -229,7 +229,7 @@ Note that the chip's own marking does **not** put A1 at the top-left. With the m
 TOP VIEW, A1 top-left
             1      2      3      4      5      6
    A      GND    GND    sig    sig    GND    GND
-   B      GND    GND    GND    GND    GND    GND
+   B      VCC    GND    GND    GND    GND    GND
    C      ?      ?      ?      ?      ?      GND
    D      ?      ?      ?      ?      ?      GND
 ```
@@ -242,24 +242,27 @@ TOP VIEW, A1 top-left
 | A4 | signal → R1/R4 area | [inferred] | same as A3 |
 | A5 | GND | [inferred] | RDL link to B5 |
 | A6 | GND | [inferred] | RDL link to B6 |
-| B1 | GND | [inferred] | PCB row-B trace bus (no RDL link to B2 on chip side, so it is tied on the PCB) |
-| B2–B6 | GND | [seen]/[inferred] | Chip RDL bus joins B2…B6; PCB bus joins B1…B6 and goes to a via next to C2 |
+| B1 | **VCC** | **[measured]** (2026-11) | Confirmed by measurement. A closer look at 171355 agrees: B1 has its own short PCB trace to the via next to decoupling cap C2, with **no** copper link to B2, and no RDL link to B2 on the chip side. (The earlier reading that the PCB bus covered B1 was wrong.) |
+| B2–B6 | GND | [seen]/[inferred] | Chip RDL bus joins B2…B6, and a matching PCB trace bus joins B2…B6 |
 | C6 | GND | [inferred] | RDL links B6–C6–D6 |
 | D6 | GND | [inferred] | RDL link to C6; PCB link C6–D6 |
 | C1, D1 | ? (possibly GND or supply) | [TBD] | Short RDL link C1–D1 on chip; a wide RDL trace from there may join the GND bus (hard to resolve optically). Closest balls to decoupling caps C1/C2 |
 | C2–C5, D2–D5 | signals / supply | [TBD] | Each has its own RDL trace to a die edge pad |
 
-**Count:** 12 balls very likely GND (A1, A2, A5, A6, B1–B6, C6, D6). That leaves **12 functional balls** at most (A3, A4, C1–C5, D1–D5), fewer if C1/D1 turn out to be GND.
+**Count:** 1 VCC (B1, measured) and 11 balls very likely GND (A1, A2, A5, A6, B2–B6, C6, D6). That leaves **12 balls** (A3, A4, C1–C5, D1–D5) to identify, and C1/D1 are tied together on the die.
 
 ### 3.1 Pin budget vs. the platform block diagram
 
 The block diagram in the platform ST (Figure 1) shows the chip's external pins as **VCC1, VCC2, GND1, GND2 and 10 GPIOs**.
 The ISO7816 UARTs, SWP, SPI and I²C presumably come out on those GPIOs.
 
-- 24 balls − 12 likely GND = **12 balls left**, which is exactly **VCC1 + VCC2 + 10 GPIOs**.
-- So, as a hypothesis: the 12 GND balls are GND1/GND2 duplicated many times (normal for a WLCSP), and the remaining 12 are **2 supply + 10 GPIO**. Reset and clock are then either GPIO functions or internal: the chip has its own clock manager and reset manager.
-- That would make **C1/D1 a supply ball** (or a pair) rather than GND. They sit next to the decoupling caps C1/C2, which fits. **[TBD]** continuity test.
-- `VCC1`/`VCC2` could be the main supply plus a separate supply for the SWP/IO domain, which is common on ST33 parts. **[TBD]**
+- **B1 = VCC** (measured). Most likely this is `VCC1`, the main supply, decoupled by C2 through the adjacent via.
+- 24 balls − 11 GND − B1 = **12 balls left**: A3, A4, C1–C5, D1–D5.
+- **C1 and D1 are joined by an RDL link on the die**, so they are one net on two balls. That leaves **11 distinct nets** for 1 supply + 10 GPIOs (`VCC2` + 10 GPIOs). This fits exactly if:
+  - **C1/D1 = `VCC2`** (doubled up like the GND balls, and next to the decoupling caps), and
+  - **A3, A4, C2–C5, D2–D5 = the 10 GPIOs** (each has its own RDL trace to a die edge pad).
+- The GND balls would then be GND1/GND2 duplicated many times on the die, which is normal for a WLCSP. Reset and clock would be GPIO functions or internal (the chip has its own clock and reset managers).
+- `VCC1`/`VCC2` could be the main supply plus a separate supply for the SWP/IO domain. **[TBD]** Measure whether C1/D1 is powered, and at what voltage compared with B1.
 
 ## 4. Other observations
 
@@ -269,7 +272,7 @@ The ISO7816 UARTs, SWP, SPI and I²C presumably come out on those GPIOs.
 
 ## 5. Next steps
 
-1. Continuity-test every pad on the bare footprint against a known GND (USB shield / battery −) to confirm or correct the GND list. Check C1/D1 first.
-2. Trace C1/C2 cap pads to balls to find VCC (and maybe a separate core/IO supply).
+1. Continuity-test every pad on the bare footprint against a known GND (USB shield / battery −) to confirm or correct the GND list. Check C1/D1 first; C1/D1 is expected **not** to be GND.
+2. ~~Find VCC~~: B1 = VCC (measured). Next, check C1/D1 for a second supply (`VCC2`) and compare its voltage with B1.
 3. Trace A3/A4 through R1/R4 to the MCU (STM32 on the S+). Likely candidates are the SE↔MCU link (ISO7816-style IO/CLK/RST or SPI) **[TBD]**.
 4. Do the same on the Flex and Stax boards to confirm the footprint and pinout are identical.
